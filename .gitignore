@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Next.js
+.next/
+out/
+
+# Production Build
+build/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local Env Files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# Project Specific
+autoclip.db
+autoclip.db-journal
+autoclip.db-shm
+autoclip.db-wal
+public/temp/
+public/autoclip-results/
+public/uploads/
+bin/*.exe
+bin/*.zip
+bin/*.bin
+bin/whisper/
+bin/whisper-temp/
+python_env/
+venv/
+__pycache__/
+*.pyc
+
+# IDEs
+.vscode/
+.idea/

@@ -1,0 +1,109 @@
+import Database from 'better-sqlite3';
+import path from 'path';
+
+const dbPath = path.join(process.cwd(), 'autoclip.db');
+const db = new Database(dbPath);
+
+// Create tables if not exist
+db.exec(`
+  CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    type TEXT, -- 'youtube' or 'upload'
+    url TEXT,
+    file_path TEXT,
+    csv_config TEXT, -- JSON string
+    status TEXT DEFAULT 'PENDING',
+    results TEXT, -- JSON string
+    error TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Migration to add 'user_id' to jobs if it doesn't exist
+try {
+  db.exec("ALTER TABLE jobs ADD COLUMN user_id TEXT");
+} catch (e) {
+  // Column already exists
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS clips (
+    id TEXT PRIMARY KEY,
+    job_id TEXT,
+    title TEXT,
+    url TEXT,
+    start_time TEXT,
+    end_time TEXT,
+    topic TEXT,
+    summary TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE,
+    password TEXT,
+    is_verified INTEGER DEFAULT 0,
+    role TEXT DEFAULT 'USER',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Migration to add 'role' if it doesn't exist (safety for existing DBs)
+try {
+  db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'USER'");
+} catch (e) {
+  // Column already exists
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reviews (
+    id TEXT PRIMARY KEY,
+    user_name TEXT,
+    user_role TEXT,
+    comment TEXT,
+    rating INTEGER,
+    avatar_url TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Seed default settings if not present
+const seedSettings = [
+  { key: 'contact_info', value: JSON.stringify({ email: 'support@autoclip.ai', address: 'Sudirman Central Business District, Jakarta', phone: '+62 812 3456 7890' }) },
+  { key: 'demo_video', value: 'https://www.youtube.com/watch?v=6d2KuiZDFrg' },
+  { key: 'pricing_plans', value: JSON.stringify([
+      { name: 'Lite', price: '0', description: 'Ideal untuk pemula dan eksplorasi fitur dasar AI.', icon: 'Zap', features: ['5 Video / Bulan', 'Transkripsi Dasar'] },
+      { name: 'Pro', price: '199.000', popular: true, description: 'Pilihan terbaik untuk kreator konten profesional.', icon: 'Rocket', features: ['Unlimited Video', 'AI Whisper High Accuracy'] },
+      { name: 'Business', price: '890.000', description: 'Solusi lengkap untuk agensi dan tim kreatif.', icon: 'Building2', features: ['Multi-user Access', 'Export 4K Resolution'] }
+    ]) 
+  }
+];
+
+const insertSetting = db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
+for (const s of seedSettings) {
+  insertSetting.run(s.key, s.value);
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS verification_tokens (
+    token TEXT PRIMARY KEY,
+    user_id TEXT,
+    expires_at DATETIME,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )
+`);
+
+export default db;

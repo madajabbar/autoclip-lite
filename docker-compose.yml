@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  autoclip:
+    build: .
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/autoclip-lite:latest
+    container_name: autoclip-lite
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./autoclip.db:/app/autoclip.db
+      - ./public/autoclip-results:/app/public/autoclip-results
+      - ./public/uploads:/app/public/uploads
+    restart: always
+    env_file:
+      - .env
+    # Optional: limit resources if needed
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 2G
