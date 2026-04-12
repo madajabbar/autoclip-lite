@@ -1,16 +1,21 @@
 # --- Build Stage ---
-FROM node:20-bookworm-slim AS builder
+FROM node:20-bookworm AS builder
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies secara lengkap
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
+    gcc \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy package files
 COPY package*.json ./
-RUN npm install
+
+# Gunakan clean install dan hapus cache jika ada kegagalan sebelumnya
+RUN npm install --include=dev
 
 COPY . .
 RUN npm run build
@@ -23,7 +28,6 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install runtime dependencies
-# ffmpeg, python3, yt-dlp
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
@@ -39,24 +43,24 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy necessary files from builder
+# Copy files dari builder
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/tsconfig.json ./
+COPY --from=builder /app/requirements.txt ./
 
 # Install production dependencies only
+# Menggunakan --build-from-source untuk better-sqlite3 agar aman di Linux
 RUN npm install --only=production
 
 # Expose port
 EXPOSE 3000
 
-# Create persistence directories
 RUN mkdir -p public/autoclip-results public/uploads public/temp
 
-# Entrypoint script to run both Next.js and Worker
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
