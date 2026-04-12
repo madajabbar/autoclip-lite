@@ -23,56 +23,53 @@ Platform SaaS untuk memotong video panjang menjadi klip viral (TikTok/Reels/Shor
 ```bash
 npm run dev
 ```
-Perintah ini akan menjalankan Next.js server dan Background Worker secara bersamaan menggunakan `concurrently`.
 
 ---
 
-## 🐳 Deployment (Docker & Linux)
+## 🐳 Deployment Manual (Docker & Linux)
 
-Project ini dikonfigurasi untuk dideploy menggunakan Docker di Linux (Debian/Ubuntu).
+Project ini dikonfigurasi untuk di-build secara otomatis oleh GitHub Actions dan di-push ke **GitHub Container Registry (GHCR)**. Anda dapat mendeploynya secara manual di server Anda.
 
-### Docker Compose
-Gunakan `docker-compose.yml` untuk menjalankan aplikasi beserta persistence datanya.
+### Persiapan di Server
+1. Pastikan **Docker** dan **Docker Compose** sudah terinstal.
+2. Buat folder project: `mkdir ~/autoclip-lite && cd ~/autoclip-lite`.
+3. Buat file `.env` di dalam folder tersebut dan isi konfigurasinya.
+4. Salin file `docker-compose.yml` dari repositori ke folder tersebut.
 
-```bash
-docker compose up -d
-```
+### Langkah-langkah Deployment
+Setiap kali ada update di GitHub, jalankan perintah berikut di server Anda:
 
-**Volume Mapping:**
-- `./autoclip.db`: Database SQLite.
-- `./public/autoclip-results`: Folder hasil pemrosesan video.
-- `./public/uploads`: Folder video yang diunggah pengguna.
+1. **Login ke GHCR** (Hanya perlu sekali per sesi):
+   ```bash
+   echo "YOUR_GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+   ```
+2. **Tarik Image Terbaru & Jalankan**:
+   ```bash
+   docker compose pull
+   docker compose up -d
+   ```
 
 ---
 
 ## 🤖 CI/CD (GitHub Actions)
 
-Otomatisasi build dan deploy tersedia melalui GitHub Actions (`.github/workflows/deploy.yml`).
+Workflow GitHub Actions saat ini dikonfigurasi hanya untuk:
+- Melakukan **Build** Docker Image.
+- Melakukan **Push** ke GHCR (`ghcr.io/username/autoclip-lite:latest`).
 
-### Setup GitHub Secrets
-Agar CI/CD berjalan, tambahkan **Secrets** berikut di repositori GitHub Anda:
-1. `SSH_HOST`: IP atau domain server target.
-2. `SSH_USER`: Username SSH server (e.g., `root`).
-3. `SSH_KEY`: Private Key SSH untuk login ke server.
-4. `GITHUB_TOKEN`: (Otomatis tersedia) Digunakan untuk push image ke GHCR.
-
-### Alur Kerja
-- Setiap **push** ke branch `master` akan mentrigger build Docker Image.
-- Image di-push ke **GitHub Container Registry (GHCR)**.
-- GitHub Actions akan masuk ke server via SSH, menarik image terbaru, dan merestart container.
+*Fitur SSH Auto-Deploy dinonaktifkan sesuai permintaan.*
 
 ---
 
 ## 🔑 Variabel Environment (.env)
 
-| Kunci | Deskripsi |
-|-------|-----------|
-| `GROQ_API_KEY` | API Key Groq (Direkomendasikan untuk Whisper cepat) |
-| `OPENAI_API_KEY` | API Key OpenAI (Alternatif Whisper atau model lain) |
-| `JWT_SECRET` | Secret key untuk enkripsi session user |
-| `RESEND_API_KEY` | API Key dari Resend untuk pengiriman email verifikasi |
-| `WHISPER_MODEL` | Ukuran model Whisper (`tiny`, `base`, `small`, `medium`) |
-| `SUBTITLE_STYLE` | Gaya teks subtitle (`tiktok`, `netflix`, `anime`) |
+Lengkapi variabel berikut di file `.env` server Anda:
+- `GROQ_API_KEY`
+- `OPENAI_API_KEY`
+- `JWT_SECRET`
+- `RESEND_API_KEY`
+- `WHISPER_MODEL` (tiny/base)
+- `SUBTITLE_STYLE` (tiktok/netflix)
 
 ---
 
