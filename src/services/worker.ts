@@ -36,7 +36,8 @@ async function transcribeLocal(audioPath: string, outputPath: string, safeFfmpeg
     });
   } catch (err: any) {
     console.error(`[WORKER-WHISPER] Error:`, err.message);
-    await writeFile(outputPath, "1\n00:00:00,000 --> 00:00:05,000\n(Gagal transkripsi lokal)");
+    const fallbackAss = `[Script Info]\nScriptType: v4.00+\nPlayResX: 384\nPlayResY: 288\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,(Gagal transkripsi lokal)`;
+    await writeFile(outputPath, fallbackAss);
   }
 }
 
@@ -129,7 +130,9 @@ async function processJob(job: any) {
       const style = process.env.SUBTITLE_STYLE || 'tiktok';
       
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Burning Subtitle)`);
-      const burnCmd = `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${assPath}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
+      // Escape path for ffmpeg ass filter (critical for Linux absolute paths)
+      const escapedAssPath = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "'\\\\''");
+      const burnCmd = `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${escapedAssPath}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
       
       try {
         await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
