@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Clock, RefreshCw, Activity, CheckCircle, XCircle, Loader2, AlertCircle, Youtube, Upload } from "lucide-react";
+import { Clock, RefreshCw, Activity, CheckCircle, XCircle, Loader2, AlertCircle, Youtube, Upload, Search, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function AdminJobs() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchJobs = async () => {
@@ -25,10 +26,29 @@ export default function AdminJobs() {
 
   useEffect(() => {
     fetchJobs();
-    // Auto refresh every 30 seconds
     const interval = setInterval(fetchJobs, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleDeleteJob = async (id: string) => {
+    if (!confirm("Hapus data job ini? Video yang sudah diproses juga akan hilang dari sistem.")) return;
+    
+    try {
+      const res = await fetch(`/api/admin/jobs/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchJobs();
+      } else {
+        alert("Gagal menghapus job.");
+      }
+    } catch (e) {
+      alert("Terjadi kesalahan koneksi.");
+    }
+  };
+
+  const filteredJobs = jobs.filter(j => 
+    (j.user_email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    j.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -65,14 +85,27 @@ export default function AdminJobs() {
           <p className="text-muted-foreground mt-2">Pantau antrean dan status pemrosesan video secara real-time.</p>
         </div>
         
-        <button 
-          onClick={fetchJobs}
-          disabled={isRefreshing}
-          className="flex items-center space-x-2 bg-muted hover:bg-muted/80 text-foreground px-5 py-3 rounded-2xl font-bold transition-all border border-border"
-        >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span>{isRefreshing ? 'Refreshing...' : 'Refresh Manual'}</span>
-        </button>
+        <div className="flex items-center space-x-4">
+          <div className="relative w-72">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input 
+              type="text" 
+              placeholder="Cari email user..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-card border border-border rounded-2xl py-3 pl-11 pr-4 outline-none focus:border-primary/50 transition-all text-foreground"
+            />
+          </div>
+          
+          <button 
+            onClick={fetchJobs}
+            disabled={isRefreshing}
+            className="flex items-center space-x-2 bg-muted hover:bg-muted/80 text-foreground px-5 py-3 rounded-2xl font-bold transition-all border border-border"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh Manual'}</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -109,17 +142,18 @@ export default function AdminJobs() {
                 <th className="px-8 py-5 font-semibold">Type</th>
                 <th className="px-8 py-5 font-semibold">Status</th>
                 <th className="px-8 py-5 font-semibold">Created At</th>
+                <th className="px-8 py-5 font-semibold text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {jobs.length === 0 ? (
+              {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-8 py-12 text-center text-muted-foreground italic">
-                    Belum ada antrean job.
+                  <td colSpan={5} className="px-8 py-12 text-center text-muted-foreground italic">
+                    {searchTerm ? `Tidak ditemukan job untuk "${searchTerm}"` : "Belum ada antrean job."}
                   </td>
                 </tr>
               ) : (
-                jobs.map((job) => (
+                filteredJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-8 py-6">
                       <div className="space-y-1">
@@ -146,6 +180,15 @@ export default function AdminJobs() {
                         hour: '2-digit',
                         minute: '2-digit'
                       })}
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <button 
+                        onClick={() => handleDeleteJob(job.id)}
+                        className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                        title="Hapus Job"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
