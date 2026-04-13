@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Settings, MessageSquare, LogOut, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Users, Settings, MessageSquare, LogOut, ShieldCheck, Activity } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 
@@ -11,6 +11,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menu = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/admin" },
     { id: "users", label: "Users", icon: <Users className="w-5 h-5" />, href: "/admin/users" },
+    { id: "jobs", label: "Job Monitor", icon: <Activity className="w-5 h-5" />, href: "/admin/jobs" },
     { id: "content", label: "Content", icon: <Settings className="w-5 h-5" />, href: "/admin/content" },
     { id: "reviews", label: "Reviews", icon: <MessageSquare className="w-5 h-5" />, href: "/admin/reviews" },
   ];

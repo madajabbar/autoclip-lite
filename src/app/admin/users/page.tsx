@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Mail, Shield, CheckCircle, XCircle, Loader2, Search } from "lucide-react";
+import { Mail, Shield, CheckCircle, XCircle, Loader2, Search, UserPlus } from "lucide-react";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [isAddingUser, setIsAddingUser] = useState(false);
   const [editForm, setEditForm] = useState({ email: "", role: "", password: "" });
+  const [addForm, setAddForm] = useState({ email: "", password: "", role: "USER", is_verified: true });
 
   const fetchUsers = () => {
     fetch("/api/admin/users")
@@ -57,6 +59,26 @@ export default function AdminUsers() {
     }
   };
 
+  const handleCreateUser = async () => {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(addForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        fetchUsers();
+        setIsAddingUser(false);
+        setAddForm({ email: "", password: "", role: "USER", is_verified: true });
+      } else {
+        alert(data.error || "Gagal membuat user.");
+      }
+    } catch (e) {
+      alert("Terjadi kesalahan koneksi.");
+    }
+  };
+
   const deleteUser = async (id: string) => {
     if (!confirm("Hapus user ini selamanya?")) return;
     try {
@@ -83,15 +105,25 @@ export default function AdminUsers() {
           <p className="text-muted-foreground mt-2">Kelola otorisasi dan akses pengguna platform.</p>
         </div>
         
-        <div className="relative w-72">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input 
-            type="text" 
-            placeholder="Cari user (email)..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-card border border-border rounded-2xl py-3 pl-11 pr-4 outline-none focus:border-primary/50 transition-all text-foreground"
-          />
+        <div className="flex items-center space-x-4">
+          <div className="relative w-72">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input 
+              type="text" 
+              placeholder="Cari user (email)..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-card border border-border rounded-2xl py-3 pl-11 pr-4 outline-none focus:border-primary/50 transition-all text-foreground"
+            />
+          </div>
+          
+          <button 
+            onClick={() => setIsAddingUser(true)}
+            className="flex items-center space-x-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-primary/20"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Tambah User</span>
+          </button>
         </div>
       </div>
 
@@ -205,6 +237,74 @@ export default function AdminUsers() {
                 className="flex-grow py-4 bg-primary text-primary-foreground rounded-2xl font-bold hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
               >
                 Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {isAddingUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm">
+          <div className="bg-card border border-border w-full max-w-md rounded-[40px] p-8 shadow-2xl space-y-6">
+            <h2 className="text-2xl font-bold text-foreground">Tambah User Baru</h2>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground ml-1">Email Address</label>
+                <input 
+                  type="email" 
+                  value={addForm.email}
+                  onChange={(e) => setAddForm({...addForm, email: e.target.value})}
+                  className="w-full bg-muted border border-border rounded-2xl py-4 px-6 outline-none text-foreground"
+                  placeholder="user@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground ml-1">Password</label>
+                <input 
+                  type="password" 
+                  value={addForm.password}
+                  onChange={(e) => setAddForm({...addForm, password: e.target.value})}
+                  className="w-full bg-muted border border-border rounded-2xl py-4 px-6 outline-none text-foreground"
+                  placeholder="********"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground ml-1">Role</label>
+                <select 
+                  value={addForm.role}
+                  onChange={(e) => setAddForm({...addForm, role: e.target.value})}
+                  className="w-full bg-muted border border-border rounded-2xl py-4 px-6 outline-none appearance-none text-foreground"
+                >
+                  <option value="USER">USER</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </div>
+              <div className="flex items-center space-x-3 pt-2">
+                <input 
+                  type="checkbox" 
+                  id="is_verified"
+                  checked={addForm.is_verified}
+                  onChange={(e) => setAddForm({...addForm, is_verified: e.target.checked})}
+                  className="w-5 h-5 rounded border-border text-primary focus:ring-primary"
+                />
+                <label htmlFor="is_verified" className="text-sm font-medium text-foreground cursor-pointer">
+                  Langsung Verifikasi Akun
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-4 pt-4">
+              <button 
+                onClick={() => setIsAddingUser(false)}
+                className="flex-grow py-4 bg-muted hover:bg-muted/80 text-foreground rounded-2xl font-bold transition-all"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleCreateUser}
+                className="flex-grow py-4 bg-primary text-primary-foreground rounded-2xl font-bold hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+              >
+                Buat User
               </button>
             </div>
           </div>
