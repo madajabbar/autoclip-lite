@@ -1,4 +1,4 @@
-import { writeFile, copyFile, mkdir, unlink } from "fs/promises";
+import { writeFile, copyFile, mkdir, unlink, chmod } from "fs/promises";
 import path from "path";
 import { exec } from "child_process";
 import util from "util";
@@ -46,8 +46,8 @@ async function updateJobStep(jobId: string, status: string, step: string) {
 }
 
 function sanitizeFilename(name: string) {
-  // Hanya izinkan alfanumerik, spasi, dash, dan underscore
-  return name.replace(/[^a-zA-Z0-9 \-_]/g, "").trim().substring(0, 100);
+  // Izinkan alfanumerik, spasi, dash, underscore, dan titik (untuk dr. dll)
+  return name.replace(/[^a-zA-Z0-9 \-_\.]/g, "").trim().substring(0, 100);
 }
 
 async function processJob(job: any) {
@@ -143,6 +143,11 @@ async function processJob(job: any) {
         console.error(`[WORKER] Burning failed for ${clipId}:`, e.message);
         await copyFile(rawClipPath, outputPath);
       }
+
+      // Ensure public readability
+      try {
+        await chmod(outputPath, 0o644);
+      } catch (e) {}
 
       // Cleanup individual clip temp files
       try {
