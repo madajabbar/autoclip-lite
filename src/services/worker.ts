@@ -1,4 +1,4 @@
-import { writeFile, copyFile, mkdir } from "fs/promises";
+import { writeFile, copyFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { exec } from "child_process";
 import util from "util";
@@ -45,7 +45,8 @@ async function updateJobStep(jobId: string, status: string, step: string) {
 }
 
 function sanitizeFilename(name: string) {
-  return name.replace(/[\\/:*?"<>|]/g, "").trim().substring(0, 100);
+  // Hanya izinkan alfanumerik, spasi, dash, dan underscore
+  return name.replace(/[^a-zA-Z0-9 \-_]/g, "").trim().substring(0, 100);
 }
 
 async function processJob(job: any) {
@@ -128,12 +129,22 @@ async function processJob(job: any) {
       const style = process.env.SUBTITLE_STYLE || 'tiktok';
       
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Burning Subtitle)`);
-      const burnCmd = `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${relativeAssPath}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
+      const burnCmd = `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${assPath}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
       
       try {
         await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
-      } catch (e) {
+      } catch (e: any) {
+        console.error(`[WORKER] Burning failed for ${clipId}:`, e.message);
         await copyFile(rawClipPath, outputPath);
+      }
+
+      // Cleanup individual clip temp files
+      try {
+        await unlink(rawClipPath);
+        await unlink(audioTempPath);
+        await unlink(assPath);
+      } catch (e) {
+        // Ignore if some files fail to delete
       }
 
       // INSERT into child table (clips)
@@ -157,6 +168,22 @@ async function processJob(job: any) {
         title: config.topic || `Klip ${i + 1}`,
         duration: `${config.start_time} - ${config.end_time}`
       });
+    }
+
+    // Cleanup per-clip temp files after loop (Optional, but good practice)
+    for (let i = 0; i < clipsConfig.length; i++) {
+      // clipId is local to the loop before, we might need a better way if we want to delete them here
+      // Better: delete them inside the loop right after they are used.
+    }
+
+    // FINAL CLEANUP: Delete the original downloaded/uploaded file
+    try {
+      if (originalFilePath && originalFilePath.includes("temp/")) {
+        console.log(`[WORKER] Cleaning up original file: ${originalFilePath}`);
+        await unlink(originalFilePath);
+      }
+    } catch (e) {
+      console.error("[WORKER] Cleanup original file failed:", e);
     }
 
     db.prepare("UPDATE jobs SET status = 'COMPLETED', current_step = 'Selesai!', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(
