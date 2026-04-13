@@ -201,7 +201,7 @@ async function processJob(job: any) {
 }
 
 async function startWorker() {
-  console.log("🚀 AutoClip Background Worker Aktif...");
+  console.log("🚀 AutoClip Background Worker Aktif [VERSI: 1.0.2 - SANITIZER AKTIF]...");
   while (true) {
     const job = db.prepare("SELECT * FROM jobs WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT 1").get();
     if (job) {
