@@ -130,9 +130,12 @@ async function processJob(job: any) {
       const style = process.env.SUBTITLE_STYLE || 'tiktok';
       
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Burning Subtitle)`);
-      // Escape path for ffmpeg ass filter (critical for Linux absolute paths)
-      const escapedAssPath = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "'\\\\''");
-      const burnCmd = `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${escapedAssPath}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
+      
+      // Use relative path for Linux/Docker compatibility in the ass filter
+      const relativePathForFfmpeg = isWin ? assPath.replace(/\\/g, "/").replace(/:/g, "\\:") : `public/temp/${clipId}.ass`;
+      const burnCmd = isWin 
+        ? `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${relativePathForFfmpeg}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`
+        : `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass=${relativePathForFfmpeg}" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
       
       try {
         await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
