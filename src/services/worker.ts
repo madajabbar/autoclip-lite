@@ -19,18 +19,18 @@ async function transcribeLocal(audioPath: string, outputPath: string, safeFfmpeg
   const pythonScript = path.join(process.cwd(), "src", "lib", "transcribe_local.py");
   const modelName = process.env.WHISPER_MODEL || "tiny";
   const pythonPath = process.env.PYTHON_PATH || "python3";
-  
+
   // Only add ffmpeg to PATH if we are using a local binary (Windows)
   const updatedEnv = { ...process.env };
   if (process.platform === "win32") {
     const ffmpegDir = path.dirname(safeFfmpegPath);
     updatedEnv.PATH = `${ffmpegDir}${path.delimiter}${process.env.PATH}`;
   }
-  
+
   try {
     const cmd = `"${pythonPath}" "${pythonScript}" "${audioPath}" "${outputPath}" ${modelName}`;
     console.log(`[WORKER-WHISPER] Running: ${cmd}`);
-    await execAsync(cmd, { 
+    await execAsync(cmd, {
       maxBuffer: 1024 * 1024 * 100,
       env: updatedEnv
     });
@@ -54,7 +54,7 @@ function sanitizeFilename(name: string) {
 async function processJob(job: any) {
   const jobId = job.id;
   console.log(`[WORKER] Memproses job: ${jobId}`);
-  
+
   await updateJobStep(jobId, 'PROCESSING', 'Menyiapkan folder pemrosesan...');
 
   try {
@@ -64,10 +64,10 @@ async function processJob(job: any) {
     await mkdir(resultsDir, { recursive: true });
 
     const isWin = process.platform === "win32";
-    const ytDlpPath = isWin 
-      ? path.join(process.cwd(), "bin", "yt-dlp.exe") 
+    const ytDlpPath = isWin
+      ? path.join(process.cwd(), "bin", "yt-dlp.exe")
       : (process.env.YT_DLP_PATH || "yt-dlp");
-      
+
     const safeFfmpegPath = isWin
       ? path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg.exe")
       : (process.env.FFMPEG_PATH || "/usr/bin/ffmpeg");
@@ -95,7 +95,7 @@ async function processJob(job: any) {
 
     const clipsConfig = JSON.parse(job.csv_config || "[]");
     const generatedClips = [];
-    
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").split(".")[0].slice(0, 15);
     const sanitizedTitle = sanitizeFilename(videoTitle);
 
@@ -103,10 +103,21 @@ async function processJob(job: any) {
     for (let i = 0; i < clipsConfig.length; i++) {
       const stepText = `Memproses Klip ${i + 1} dari ${clipsConfig.length}...`;
       await updateJobStep(jobId, 'PROCESSING', stepText);
-      
+
       const config = clipsConfig[i];
-      const clipId = uuidv4();
       
+      // Keamanan & Pembersihan: Ambil hanya bagian waktu jika data tercampur (titik koma)
+      let startTime = (config.start_time || "").toString().split(';')[0].trim();
+      let endTime = (config.end_time || "").toString().split(';')[1] || (config.end_time || "").toString().split(';')[0];
+      endTime = endTime.trim();
+
+      if (!startTime || !endTime || startTime === "start_time") {
+        console.warn(`[WORKER] Melewati klip ${i + 1} karena data tidak valid:`, config);
+        continue;
+      }
+
+      const clipId = uuidv4();
+
       // Descriptive filename
       const descriptiveName = `${sanitizedTitle} [${timestamp}] ${i + 1} dari ${clipsConfig.length}.mp4`;
       const outputPath = path.join(resultsDir, descriptiveName);
@@ -120,24 +131,24 @@ async function processJob(job: any) {
 
       console.log(`[WORKER] Clipping ${i + 1}/${clipsConfig.length}`);
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Memotong Video)`);
-      await execAsync(`"${safeFfmpegPath}" -y -ss ${config.start_time} -to ${config.end_time} -i "${originalFilePath}" -c copy "${rawClipPath}"`);
-      
+      await execAsync(`"${safeFfmpegPath}" -y -ss ${startTime} -to ${endTime} -i "${originalFilePath}" -c copy "${rawClipPath}"`);
+
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Ekstraksi Audio)`);
       await execAsync(`"${safeFfmpegPath}" -y -i "${rawClipPath}" -vn -ar 16000 -ac 1 -c:a libmp3lame "${audioTempPath}"`);
-      
+
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Transkripsi AI Local)`);
       await transcribeLocal(audioTempPath, assPath, safeFfmpegPath);
 
       const style = process.env.SUBTITLE_STYLE || 'tiktok';
-      
+
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Burning Subtitle)`);
-      
+
       // Use relative path for Linux/Docker compatibility in the ass filter
       const relativePathForFfmpeg = isWin ? assPath.replace(/\\/g, "/").replace(/:/g, "\\:") : `public/temp/${clipId}.ass`;
-      const burnCmd = isWin 
+      const burnCmd = isWin
         ? `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${relativePathForFfmpeg}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`
         : `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass=${relativePathForFfmpeg}" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
-      
+
       try {
         await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
       } catch (e: any) {
@@ -148,7 +159,7 @@ async function processJob(job: any) {
       // Ensure public readability
       try {
         await chmod(outputPath, 0o644);
-      } catch (e) {}
+      } catch (e) { }
 
       // Cleanup individual clip temp files
       try {
