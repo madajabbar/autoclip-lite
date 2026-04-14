@@ -46,8 +46,9 @@ async function updateJobStep(jobId: string, status: string, step: string) {
 }
 
 function sanitizeFilename(name: string) {
-  // Izinkan alfanumerik, spasi, dash, underscore, dan titik (untuk dr. dll)
-  return name.replace(/[^a-zA-Z0-9 \-_\.]/g, "").trim().substring(0, 100);
+  // Hanya izinkan alfanumerik, spasi, dash, dan underscore
+  // Kita buang titik (.) karena terbukti merusak link URL di server
+  return name.replace(/[^a-zA-Z0-9 \-_]/g, "").trim().substring(0, 100);
 }
 
 async function processJob(job: any) {
