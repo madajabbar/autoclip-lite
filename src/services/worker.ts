@@ -110,7 +110,7 @@ async function processJob(job: any) {
       // Descriptive filename
       const descriptiveName = `${sanitizedTitle} [${timestamp}] ${i + 1} dari ${clipsConfig.length}.mp4`;
       const outputPath = path.join(resultsDir, descriptiveName);
-      const encodedUrl = `/autoclip-results/${encodeURIComponent(descriptiveName)}`;
+      const encodedUrl = `/api/videos/${encodeURIComponent(descriptiveName)}`;
       const clipTitle = `${sanitizedTitle} [${new Date().toLocaleDateString()}]`;
 
       const assPath = path.join(tempDir, `${clipId}.ass`);
