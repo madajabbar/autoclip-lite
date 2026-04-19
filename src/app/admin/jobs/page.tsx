@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Clock, RefreshCw, Activity, CheckCircle, XCircle, Loader2, AlertCircle, Youtube, Upload, Search, Trash2 } from "lucide-react";
+import { useState, useEffect, Fragment } from "react";
+import { Clock, RefreshCw, Activity, CheckCircle, XCircle, Loader2, AlertCircle, Play, Upload, Search, Trash2, Video, Download } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function AdminJobs() {
@@ -154,7 +154,7 @@ export default function AdminJobs() {
                 </tr>
               ) : (
                 filteredJobs.map((job) => (
-                  <React.Fragment key={job.id}>
+                  <Fragment key={job.id}>
                     <tr className="hover:bg-muted/30 transition-colors">
                       <td className="px-8 py-6">
                         <div className="space-y-1">
@@ -164,7 +164,7 @@ export default function AdminJobs() {
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-center space-x-2 text-sm text-foreground">
-                          {job.type === 'youtube' ? <Youtube className="w-4 h-4 text-red-500" /> : <Upload className="w-4 h-4 text-blue-500" />}
+                          {job.type === 'youtube' ? <Play className="w-4 h-4 text-red-500" /> : <Upload className="w-4 h-4 text-blue-500" />}
                           <span className="capitalize">{job.type}</span>
                         </div>
                       </td>
@@ -236,7 +236,7 @@ export default function AdminJobs() {
                             </div>
                         </td>
                     </tr>
-                  </React.Fragment>
+                  </Fragment>
                 ))
               )}
             </tbody>
