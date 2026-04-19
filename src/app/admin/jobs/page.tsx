@@ -135,7 +135,7 @@ export default function AdminJobs() {
 
       <div className="bg-card border border-border rounded-[40px] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left border-collapse">
             <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-8 py-5 font-semibold">User / ID</th>
@@ -154,43 +154,89 @@ export default function AdminJobs() {
                 </tr>
               ) : (
                 filteredJobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-8 py-6">
-                      <div className="space-y-1">
-                        <div className="font-semibold text-foreground">{job.user_email || 'Guest/Unknown'}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded w-fit uppercase">ID: {job.id.split('-')[0]}...</div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center space-x-2 text-sm text-foreground">
-                        {job.type === 'youtube' ? <Youtube className="w-4 h-4 text-red-500" /> : <Upload className="w-4 h-4 text-blue-500" />}
-                        <span className="capitalize">{job.type}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-bold border ${getStatusStyle(job.status)}`}>
-                        {getStatusIcon(job.status)}
-                        <span>{job.status}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-sm text-muted-foreground">
-                      {new Date(job.created_at).toLocaleString('id-ID', {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <button 
-                        onClick={() => handleDeleteJob(job.id)}
-                        className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                        title="Hapus Job"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
+                  <React.Fragment key={job.id}>
+                    <tr className="hover:bg-muted/30 transition-colors">
+                      <td className="px-8 py-6">
+                        <div className="space-y-1">
+                          <div className="font-semibold text-foreground">{job.user_email || 'Guest/Unknown'}</div>
+                          <div className="text-[10px] text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded w-fit uppercase">ID: {job.id.split('-')[0]}...</div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center space-x-2 text-sm text-foreground">
+                          {job.type === 'youtube' ? <Youtube className="w-4 h-4 text-red-500" /> : <Upload className="w-4 h-4 text-blue-500" />}
+                          <span className="capitalize">{job.type}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="space-y-2">
+                          <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-bold border ${getStatusStyle(job.status)}`}>
+                            {getStatusIcon(job.status)}
+                            <span>{job.status}</span>
+                          </div>
+                          {job.status === 'COMPLETED' && job.results && job.results.length > 0 && (
+                            <div className="text-[10px] text-green-500 font-bold block ml-1">{job.results.length} Clips OK</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-sm text-muted-foreground">
+                        {new Date(job.created_at).toLocaleString('id-ID', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          {job.status === 'COMPLETED' && job.results && job.results.length > 0 && (
+                            <button 
+                              onClick={() => {
+                                const el = document.getElementById(`results-${job.id}`);
+                                if (el) el.classList.toggle('hidden');
+                              }}
+                              className="flex items-center space-x-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl text-xs font-bold transition-all"
+                            >
+                              <Video className="w-3 h-3" />
+                              <span>Lihat Hasil</span>
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleDeleteJob(job.id)}
+                            className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                            title="Hapus Job"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Expandable Results Area */}
+                    <tr id={`results-${job.id}`} className="hidden bg-muted/10 border-b border-border">
+                        <td colSpan={5} className="px-8 py-8">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                {job.results && job.results.map((clip: any) => (
+                                    <div key={clip.id} className="bg-card border border-border rounded-2xl overflow-hidden group">
+                                        <div className="aspect-[9/16] bg-black relative">
+                                            <video src={clip.url} controls className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className="p-3">
+                                            <p className="text-[10px] font-bold truncate text-foreground mb-1">{clip.title}</p>
+                                            <a 
+                                              href={clip.url} 
+                                              download 
+                                              className="flex items-center justify-center space-x-1 w-full py-1.5 bg-muted hover:bg-muted/80 text-[10px] font-bold rounded-lg transition-all"
+                                            >
+                                                <Download className="w-3 h-3" />
+                                                <span>Download</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </td>
+                    </tr>
+                  </React.Fragment>
                 ))
               )}
             </tbody>

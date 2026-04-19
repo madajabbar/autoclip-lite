@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN users ON jobs.user_id = users.id 
       ORDER BY jobs.created_at DESC
     `).all();
-    
+
     return NextResponse.json({ success: true, jobs });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
