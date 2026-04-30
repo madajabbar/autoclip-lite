@@ -15,16 +15,16 @@ def format_ass_time(seconds: float):
         centiseconds = 0
     return f"{hours:d}:{minutes:02d}:{secs:02d}.{centiseconds:02d}"
 
-def get_ass_header(font_name="Arial Black", font_size=36, primary_color="&H00FFFFFF", back_color="&H00000000"):
+def get_ass_header(font_name="Arial Black", font_size=72, primary_color="&H00FFFFFF", back_color="&H00000000"):
     return f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 1280
-PlayResY: 720
+PlayResX: 1080
+PlayResY: 1920
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font_name},{font_size},{primary_color},&H0000FFFF,&H00000000,{back_color},-1,0,0,0,100,100,0,0,3,2,0,2,10,10,50,1
+Style: Default,{font_name},{font_size},{primary_color},&H0000FFFF,&H00000000,{back_color},-1,0,0,0,100,100,0,0,3,4,0,2,20,20,400,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

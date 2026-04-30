@@ -145,9 +145,13 @@ async function processJob(job: any) {
 
       // Use relative path for Linux/Docker compatibility in the ass filter
       const relativePathForFfmpeg = isWin ? assPath.replace(/\\/g, "/").replace(/:/g, "\\:") : `public/temp/${clipId}.ass`;
+      
+      // Filter video untuk rasio 9:16 (Portrait) dengan letterboxing (atas-bawah hitam)
+      const filterGraph = `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`;
+      
       const burnCmd = isWin
-        ? `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass='${relativePathForFfmpeg}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`
-        : `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "ass=${relativePathForFfmpeg}" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
+        ? `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "${filterGraph},ass='${relativePathForFfmpeg}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`
+        : `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "${filterGraph},ass=${relativePathForFfmpeg}" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
 
       try {
         await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
