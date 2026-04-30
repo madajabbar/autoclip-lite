@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, XCircle, Clock, Video, Download, RefreshCw, Layers } from "lucide-react";
+import { Loader2, XCircle, Clock, Video, Download, RefreshCw, Layers, Play } from "lucide-react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Job = {
@@ -142,9 +143,18 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-border pt-6">
                       {job.results.map((clip: any) => (
                         <div key={clip.id} className="bg-background/50 border border-border rounded-xl  overflow-hidden group hover:border-primary/50 transition-colors">
-                          <div className="aspect-[9/16] bg-black relative">
-                            <video src={clip.url} controls className="w-full h-full object-cover" />
-                          </div>
+                          <Link href={`/play?url=${encodeURIComponent(clip.url)}&title=${encodeURIComponent(clip.title)}`} className="aspect-[9/16] bg-muted relative flex items-center justify-center group/play cursor-pointer block overflow-hidden">
+                            <div className="absolute inset-0 bg-black/40 group-hover/play:bg-black/20 transition-colors z-10" />
+                            {/* Teks placeholder jika gambar thumbnail belum ada */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/30 z-0">
+                                <Video className="w-12 h-12 mb-2" />
+                                <span className="text-xs font-bold uppercase">Video Ready</span>
+                            </div>
+                            {/* Tombol Play */}
+                            <div className="w-14 h-14 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-xl group-hover/play:scale-110 transition-transform z-20">
+                               <Play className="w-6 h-6 ml-1" fill="currentColor" />
+                            </div>
+                          </Link>
                           <div className="p-3 flex items-center justify-between">
                              <div className="min-w-0">
                                <p className="text-sm font-medium truncate text-foreground">{clip.title}</p>
