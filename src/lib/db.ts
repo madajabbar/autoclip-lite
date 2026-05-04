@@ -19,6 +19,7 @@ function initDb() {
       type TEXT, -- 'youtube' or 'upload'
       url TEXT,
       file_path TEXT,
+      video_title TEXT,
       csv_config TEXT, -- JSON string
       status TEXT DEFAULT 'PENDING',
       results TEXT, -- JSON string
@@ -34,6 +35,11 @@ function initDb() {
   } catch (e) {
     // Column already exists
   }
+
+  // Migration to add 'video_title' to jobs
+  try {
+    _db.exec("ALTER TABLE jobs ADD COLUMN video_title TEXT");
+  } catch (e) {}
 
   _db.exec(`
     CREATE TABLE IF NOT EXISTS clips (
