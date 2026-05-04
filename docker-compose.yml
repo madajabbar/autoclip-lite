@@ -17,7 +17,7 @@ services:
       - FASTAPI_URL=http://autoclip-api:8000
       - DB_PATH=/app/data/autoclip.db
     env_file:
-      - .env.local
+      - .env
 
   autoclip-api:
     build: .
@@ -31,4 +31,4 @@ services:
       - ./public/temp:/app/public/temp
     restart: always
     env_file:
-      - .env.local
+      - .env

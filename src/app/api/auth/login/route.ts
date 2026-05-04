@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Set cookie
     const cookie = serialize("autoclip_session", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" && req.headers.get("x-forwarded-proto") === "https",
       maxAge: 7 * 24 * 60 * 60,
       path: "/",
     });
