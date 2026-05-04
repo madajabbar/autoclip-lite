@@ -8,15 +8,16 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./autoclip.db:/app/autoclip.db
+      - ./data:/app/data
       - ./public/autoclip-results:/app/public/autoclip-results
       - ./public/uploads:/app/public/uploads
       - ./public/temp:/app/public/temp
     restart: always
     environment:
       - FASTAPI_URL=http://autoclip-api:8000
+      - DB_PATH=/app/data/autoclip.db
     env_file:
-      - .env
+      - .env.local
 
   autoclip-api:
     build: .
@@ -30,4 +31,4 @@ services:
       - ./public/temp:/app/public/temp
     restart: always
     env_file:
-      - .env
+      - .env.local

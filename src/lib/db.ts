@@ -8,7 +8,7 @@ let _db: Database.Database | null = null;
 function initDb() {
   if (_db) return;
 
-  const dbPath = path.join(process.cwd(), 'autoclip.db');
+  const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'autoclip.db');
   _db = new Database(dbPath);
 
   // Create tables if not exist
