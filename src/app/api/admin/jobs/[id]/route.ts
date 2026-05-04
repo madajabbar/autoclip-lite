@@ -14,6 +14,7 @@ export async function DELETE(
 
   const { id } = await params;
 
+  try {
     const job = db.prepare("SELECT * FROM jobs WHERE id = ?").get(id) as any;
     if (!job) {
       return NextResponse.json({ error: "Job tidak ditemukan" }, { status: 404 });
