@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
 
 const dbPath = path.join(process.cwd(), 'autoclip.db');
 const db = new Database(dbPath);
@@ -59,6 +61,22 @@ try {
   db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'USER'");
 } catch (e) {
   // Column already exists
+}
+
+// Seed default admin account if no users exist
+try {
+  const userCount = db.prepare("SELECT count(*) as count FROM users").get() as { count: number };
+  if (userCount.count === 0) {
+    const hashedPassword = bcrypt.hashSync("admin123", 10);
+    const adminId = uuidv4();
+    db.prepare(`
+      INSERT INTO users (id, email, password, is_verified, role)
+      VALUES (?, ?, ?, 1, 'ADMIN')
+    `).run(adminId, 'madajabbar22@gmail.com', hashedPassword);
+    console.log("🌱 Default ADMIN account created: madajabbar22@gmail.com / admin123");
+  }
+} catch (e) {
+  console.error("Gagal membuat default admin:", e);
 }
 
 db.exec(`
