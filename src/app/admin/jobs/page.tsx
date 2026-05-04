@@ -9,6 +9,8 @@ export default function AdminJobs() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchJobs = async () => {
     setIsRefreshing(true);
@@ -49,6 +51,11 @@ export default function AdminJobs() {
     (j.user_email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     j.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentJobs = filteredJobs.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -153,7 +160,7 @@ export default function AdminJobs() {
                   </td>
                 </tr>
               ) : (
-                filteredJobs.map((job) => (
+                currentJobs.map((job) => (
                   <Fragment key={job.id}>
                     <tr className="hover:bg-muted/30 transition-colors">
                       <td className="px-8 py-6">
@@ -242,6 +249,32 @@ export default function AdminJobs() {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center px-8 py-4 border-t border-border bg-muted/20">
+            <span className="text-xs text-muted-foreground font-mono">
+              Menampilkan {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredJobs.length)} dari {filteredJobs.length} job
+            </span>
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+              >
+                Prev
+              </button>
+              <div className="flex items-center px-4 font-mono text-xs font-bold bg-background border border-border rounded-lg">
+                {currentPage} / {totalPages}
+              </div>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

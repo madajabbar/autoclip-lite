@@ -7,6 +7,8 @@ export default function AdminReviews() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
   
   // Form State
   const [form, setForm] = useState({
@@ -63,6 +65,11 @@ export default function AdminReviews() {
   };
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentReviews = reviews.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(reviews.length / itemsPerPage);
 
   return (
     <div className="space-y-10">
@@ -121,7 +128,7 @@ export default function AdminReviews() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {reviews.map((review) => (
+        {currentReviews.map((review) => (
           <div key={review.id} className="bg-card border border-border p-8 rounded-[40px] relative group h-fit shadow-sm hover:shadow-md transition-all">
             <button 
               onClick={() => handleDelete(review.id)}
@@ -145,6 +152,33 @@ export default function AdminReviews() {
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center px-8 py-4 bg-card border border-border rounded-[20px]">
+          <span className="text-xs text-muted-foreground font-mono">
+            Menampilkan {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, reviews.length)} dari {reviews.length} ulasan
+          </span>
+          <div className="flex space-x-2">
+            <button 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+            >
+              Prev
+            </button>
+            <div className="flex items-center px-4 font-mono text-xs font-bold bg-background border border-border rounded-lg">
+              {currentPage} / {totalPages}
+            </div>
+            <button 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

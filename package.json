@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"npm run worker\"",
+    "dev": "concurrently \"next dev -p 3001\" \"npm run worker\"",
     "worker": "tsx watch src/services/worker.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "eslint"
   },
   "dependencies": {

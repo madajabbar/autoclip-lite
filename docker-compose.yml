@@ -1,21 +1,33 @@
 version: '3.8'
 
 services:
-  autoclip:
+  autoclip-web:
     build: .
     image: ghcr.io/madajabbar/autoclip-lite:latest
-    container_name: autoclip-lite
+    container_name: autoclip-web
     ports:
-      - "3001:3000"
+      - "3001:3001"
     volumes:
       - ./autoclip.db:/app/autoclip.db
       - ./public/autoclip-results:/app/public/autoclip-results
       - ./public/uploads:/app/public/uploads
+      - ./public/temp:/app/public/temp
+    restart: always
+    environment:
+      - FASTAPI_URL=http://autoclip-api:8000
+    env_file:
+      - .env
+
+  autoclip-api:
+    build: .
+    image: ghcr.io/madajabbar/autoclip-lite:latest
+    container_name: autoclip-api
+    ports:
+      - "8000:8000"
+    command: ["sh", "-c", "cd src/lib/fastapi && uvicorn main:app --host 0.0.0.0 --port 8000"]
+    volumes:
+      - ./public/autoclip-results:/app/public/autoclip-results
+      - ./public/temp:/app/public/temp
     restart: always
     env_file:
       - .env
-    # Optional: limit resources if needed
-    # deploy:
-    #   resources:
-    #     limits:
-    #       memory: 2G

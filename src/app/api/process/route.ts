@@ -82,6 +82,13 @@ export async function POST(req: NextRequest) {
       'PENDING'
     );
 
+    // Trigger the worker to wake up (Event-Driven)
+    try {
+      fetch("http://127.0.0.1:3002/ping", { method: "POST" }).catch(() => {});
+    } catch (e) {
+      console.log("Worker ping failed, might be offline.");
+    }
+
     return NextResponse.json({
       success: true,
       jobId: jobId

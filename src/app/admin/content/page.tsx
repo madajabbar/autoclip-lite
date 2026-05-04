@@ -8,6 +8,8 @@ export default function AdminContent() {
   const [saving, setSaving] = useState(false);
   const [showClipSelector, setShowClipSelector] = useState(false);
   const [availableClips, setAvailableClips] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const [settings, setSettings] = useState<any>({
     pricing_plans: [],
     contact_info: {},
@@ -27,7 +29,10 @@ export default function AdminContent() {
     setShowClipSelector(true);
     const res = await fetch("/api/admin/all-clips");
     const data = await res.json();
-    if (data.clips) setAvailableClips(data.clips);
+    if (data.clips) {
+      setAvailableClips(data.clips);
+      setCurrentPage(1);
+    }
   };
 
   const handleSave = async (key: string, value: any) => {
@@ -47,6 +52,11 @@ export default function AdminContent() {
   };
 
   if (loading) return <div className="flex h-64 items-center justify-center text-primary"><Loader2 className="animate-spin text-primary" /></div>;
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentClips = availableClips.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(availableClips.length / itemsPerPage);
 
   return (
     <div className="space-y-12 pb-20">
@@ -100,7 +110,7 @@ export default function AdminContent() {
             
             <div className="flex-grow overflow-y-auto space-y-3 pr-2 custom-scrollbar">
               {availableClips.length === 0 && <p className="text-center text-muted-foreground py-10">Belum ada clip yang dihasilkan.</p>}
-              {availableClips.map((clip) => (
+              {currentClips.map((clip) => (
                 <div key={clip.id} className="p-4 bg-muted/50 border border-border rounded-2xl flex items-center justify-between group hover:border-primary/50 transition-all">
                   <div className="flex flex-col">
                     <span className="font-bold text-sm truncate max-w-[300px] text-foreground">{clip.video_title}</span>
@@ -118,6 +128,30 @@ export default function AdminContent() {
                 </div>
               ))}
             </div>
+            
+            {totalPages > 1 && (
+              <div className="flex justify-between items-center mt-6 pt-4 border-t border-border">
+                <span className="text-xs text-muted-foreground font-mono">
+                  {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, availableClips.length)} dari {availableClips.length}
+                </span>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+                  >
+                    Prev
+                  </button>
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

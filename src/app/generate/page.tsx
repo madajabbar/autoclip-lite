@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Tv, Upload, Scissors, Download, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import DashboardLayout from "@/components/DashboardLayout";
 
 export default function Page() {
   const [tab, setTab] = useState<"youtube" | "upload">("youtube");
@@ -105,8 +106,8 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-8 md:p-24 selection:bg-primary/20 transition-colors duration-300">
-      <main className="max-w-4xl mx-auto space-y-12">
+    <DashboardLayout>
+      <div className="max-w-4xl mx-auto space-y-12 pb-12 pt-4">
         {/* Header */}
         <div className="text-center space-y-4">
           <motion.div 
@@ -265,7 +266,7 @@ export default function Page() {
             </div>
           </motion.div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

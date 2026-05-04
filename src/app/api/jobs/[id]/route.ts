@@ -50,3 +50,57 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+import fs from "fs";
+import path from "path";
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const job: any = db.prepare("SELECT * FROM jobs WHERE id = ?").get(id);
+
+    if (!job) {
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+
+    if (job.user_id !== session.userId && session.role !== 'ADMIN') {
+      return NextResponse.json({ error: "Forbidden: Anda tidak memiliki akses ke job ini." }, { status: 403 });
+    }
+
+    // 1. Delete original file
+    if (job.file_path && fs.existsSync(job.file_path)) {
+      try { fs.unlinkSync(job.file_path); } catch (e) {}
+    }
+
+    // 2. Find and delete clip files
+    const clips = db.prepare("SELECT * FROM clips WHERE job_id = ?").all(id);
+    for (const clip of clips as any[]) {
+      if (clip.url) {
+        // url is like /api/videos/filename.mp4
+        const filename = decodeURIComponent(clip.url.split('/').pop() || "");
+        if (filename) {
+          const filePath = path.join(process.cwd(), "public", "autoclip-results", filename);
+          if (fs.existsSync(filePath)) {
+             try { fs.unlinkSync(filePath); } catch(e) {}
+          }
+        }
+      }
+    }
+
+    // 3. Delete from DB
+    db.prepare("DELETE FROM clips WHERE job_id = ?").run(id);
+    db.prepare("DELETE FROM jobs WHERE id = ?").run(id);
+
+    return NextResponse.json({ success: true, message: "Job dan file terkait berhasil dihapus" });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

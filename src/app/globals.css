@@ -1,45 +1,112 @@
 @import "tailwindcss";
 
-@theme {
-  /* Common Variables */
-  --color-primary: #3b82f6;
-  --color-primary-foreground: #ffffff;
+@layer base {
+  :root {
+    /* AutoClip Light Theme */
+    --color-primary-container-var: #00f0ff;
+    --color-on-primary-container-var: #006970;
+    --color-secondary-container-var: #dae2fd;
+    --color-on-secondary-container-var: #5c647a;
+    --color-surface-var: #f3fbfb;
+    --color-on-surface-var: #151d1e;
+    --color-surface-variant-var: #dce4e5;
+    --color-on-surface-variant-var: #3b494b;
+    --color-background-var: #f3fbfb;
+    --color-on-background-var: #151d1e;
+    --color-outline-var: #6a7a7b;
+    --color-outline-variant-var: #b9cacb;
+    --color-primary-var: #006970;
+    --color-on-primary-var: #ffffff;
+    --color-error-var: #ba1a1a;
+    
+    /* NextJS/Shadcn Standard UI Variables (Light Mode) */
+    --foreground: #151d1e;
+    --card: rgba(255, 255, 255, 0.8);
+    --card-foreground: #151d1e;
+    --border: rgba(226, 232, 240, 0.5);
+    --muted: #edf5f6;
+    --muted-foreground: #6a7a7b;
+    --accent: #e7eff0;
+    --accent-foreground: #151d1e;
+  }
 
-  /* Theme-aware Variables (overridden in body classes) */
-  --color-background: var(--background);
+  [class~="dark"] {
+    /* AutoClip Dark Theme */
+    --color-primary-container-var: #00f0ff;
+    --color-on-primary-container-var: #006970;
+    --color-secondary-container-var: #7701d0;
+    --color-on-secondary-container-var: #dcb7ff;
+    --color-surface-var: #0d1515;
+    --color-on-surface-var: #dce4e5;
+    --color-surface-variant-var: #2e3637;
+    --color-on-surface-variant-var: #b9cacb;
+    --color-background-var: #0d1515;
+    --color-on-background-var: #dce4e5;
+    --color-outline-var: #849495;
+    --color-outline-variant-var: #3b494b;
+    --color-primary-var: #dbfcff;
+    --color-on-primary-var: #00363a;
+    --color-error-var: #ffb4ab;
+    
+    /* NextJS/Shadcn Standard UI Variables (Dark Mode) */
+    --foreground: #dce4e5;
+    --card: rgba(5, 5, 5, 0.8);
+    --card-foreground: #dce4e5;
+    --border: rgba(255, 255, 255, 0.1);
+    --muted: rgba(255, 255, 255, 0.05);
+    --muted-foreground: #b9cacb;
+    --accent: rgba(255, 255, 255, 0.1);
+    --accent-foreground: #dce4e5;
+  }
+
+  body {
+    background-color: var(--color-background-var);
+    color: var(--color-on-background-var);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+@theme {
+  --color-primary-container: var(--color-primary-container-var);
+  --color-on-primary-container: var(--color-on-primary-container-var);
+  --color-secondary-container: var(--color-secondary-container-var);
+  --color-on-secondary-container: var(--color-on-secondary-container-var);
+  --color-surface: var(--color-surface-var);
+  --color-on-surface: var(--color-on-surface-var);
+  --color-surface-variant: var(--color-surface-variant-var);
+  --color-on-surface-variant: var(--color-on-surface-variant-var);
+  --color-background: var(--color-background-var);
+  --color-on-background: var(--color-on-background-var);
+  --color-outline: var(--color-outline-var);
+  --color-outline-variant: var(--color-outline-variant-var);
+  --color-primary: var(--color-primary-var);
+  --color-on-primary: var(--color-on-primary-var);
+  --color-error: var(--color-error-var);
+
+  /* Map standard utility variables */
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary-foreground: var(--color-on-primary-var);
+
+  --font-space: "Space Grotesk", sans-serif;
 }
 
-@layer base {
-  :root {
-    --background: #ffffff;
-    --foreground: #09090b;
-    --card: #f8fafc;
-    --card-foreground: #09090b;
-    --border: #e2e8f0;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
+@layer utilities {
+  .glass-card {
+    background: var(--card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
   }
-
-  [class~="dark"] {
-    --background: #050505;
-    --foreground: #fafafa;
-    --card: #0a0a0a;
-    --card-foreground: #fafafa;
-    --border: #1e1e1e;
-    --muted: #18181b;
-    --muted-foreground: #a1a1aa;
+  .glow-active {
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
   }
-
-  body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
-    font-family: Arial, Helvetica, sans-serif;
-    transition: background-color 0.3s ease, color 0.3s ease;
+  .text-glow {
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
   }
 }

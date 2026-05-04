@@ -60,8 +60,8 @@ COPY --from=builder /app/requirements.txt ./
 # Menggunakan --build-from-source untuk better-sqlite3 agar aman di Linux
 RUN npm install --only=production
 
-# Expose port
-EXPOSE 3000
+# Expose ports for Next.js and FastAPI
+EXPOSE 3001 8000
 
 RUN mkdir -p public/autoclip-results public/uploads public/temp
 

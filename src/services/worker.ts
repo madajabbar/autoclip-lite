@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import util from "util";
 import { v4 as uuidv4 } from "uuid";
 import db from "../lib/db";
+import http from "http";
 
 const execAsync = util.promisify(exec);
 
@@ -15,34 +16,53 @@ const SUBTITLE_STYLES: Record<string, string> = {
   minimalist: "Fontname=Arial,Fontsize=18,PrimaryColour=&H00FFFFFF,Outline=0,Shadow=0.5,Alignment=2",
 };
 
-async function transcribeLocal(audioPath: string, outputPath: string, safeFfmpegPath: string) {
-  const pythonScript = path.join(process.cwd(), "src", "lib", "transcribe_local.py");
-  const modelName = process.env.WHISPER_MODEL || "tiny";
-  const pythonPath = process.env.PYTHON_PATH || "python3";
-
-  // Only add ffmpeg to PATH if we are using a local binary (Windows)
-  const updatedEnv = { ...process.env };
-  if (process.platform === "win32") {
-    const ffmpegDir = path.dirname(safeFfmpegPath);
-    updatedEnv.PATH = `${ffmpegDir}${path.delimiter}${process.env.PATH}`;
+class MicroTasks {
+  // Task A1: Potong klip mentah
+  static async extractRawClip(ffmpegPath: string, original: string, start: string, end: string, out: string) {
+    await execAsync(`"${ffmpegPath}" -y -ss ${start} -to ${end} -i "${original}" -c copy "${out}"`);
   }
 
-  try {
-    const cmd = `"${pythonPath}" "${pythonScript}" "${audioPath}" "${outputPath}" ${modelName}`;
-    console.log(`[WORKER-WHISPER] Running: ${cmd}`);
-    await execAsync(cmd, {
-      maxBuffer: 1024 * 1024 * 100,
-      env: updatedEnv
+  // Task A2: Ekstrak Audio
+  static async extractAudio(ffmpegPath: string, rawVideo: string, outAudio: string) {
+    await execAsync(`"${ffmpegPath}" -y -i "${rawVideo}" -vn -ar 16000 -ac 1 -c:a libmp3lame "${outAudio}"`);
+  }
+
+  // Task B: Panggil FastAPI Inference Engine
+  static async generateSubtitles(audioPath: string, assPath: string) {
+    console.log(`[TASK-B] Sending audio to FastAPI Inference Engine...`);
+    const apiUrl = process.env.FASTAPI_URL || "http://127.0.0.1:8000";
+    const response = await fetch(`${apiUrl}/transcribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audio_path: audioPath, ass_path: assPath })
     });
-  } catch (err: any) {
-    console.error(`[WORKER-WHISPER] Error:`, err.message);
-    const fallbackAss = `[Script Info]\nScriptType: v4.00+\nPlayResX: 384\nPlayResY: 288\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,(Gagal transkripsi lokal)`;
-    await writeFile(outputPath, fallbackAss);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`FastAPI Error: ${response.status} ${errorText}`);
+    }
+  }
+
+  // Task C: Render/Burn Subtitles
+  static async renderFinalVideo(ffmpegPath: string, rawVideo: string, assPath: string, finalOut: string) {
+    const isWin = process.platform === "win32";
+    // For FFmpeg ASS filter, paths need strict formatting
+    const relativePathForFfmpeg = isWin ? assPath.replace(/\\/g, "/").replace(/:/g, "\\:") : assPath;
+    
+    // Scale and pad to 9:16 portrait
+    const filterGraph = `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`;
+    
+    // Wrap the ASS path in single quotes to handle spaces if isWin or fallback
+    const burnCmd = `"${ffmpegPath}" -y -i "${rawVideo}" -vf "${filterGraph},ass='${relativePathForFfmpeg}'" -c:v libx264 -preset ultrafast -c:a copy "${finalOut}"`;
+    await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
   }
 }
 
 async function updateJobStep(jobId: string, status: string, step: string) {
-  db.prepare("UPDATE jobs SET status = ?, current_step = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, step, jobId);
+  const result = db.prepare("UPDATE jobs SET status = ?, current_step = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, step, jobId);
+  if (result.changes === 0) {
+    throw new Error("JOB_CANCELLED");
+  }
 }
 
 function sanitizeFilename(name: string) {
@@ -130,33 +150,30 @@ async function processJob(job: any) {
       const rawClipPath = path.join(tempDir, `${clipId}_raw.mp4`);
 
       console.log(`[WORKER] Clipping ${i + 1}/${clipsConfig.length}`);
-      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Memotong Video)`);
-      await execAsync(`"${safeFfmpegPath}" -y -ss ${startTime} -to ${endTime} -i "${originalFilePath}" -c copy "${rawClipPath}"`);
-
-      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Ekstraksi Audio)`);
-      await execAsync(`"${safeFfmpegPath}" -y -i "${rawClipPath}" -vn -ar 16000 -ac 1 -c:a libmp3lame "${audioTempPath}"`);
-
-      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Transkripsi AI Local)`);
-      await transcribeLocal(audioTempPath, assPath, safeFfmpegPath);
-
-      const style = process.env.SUBTITLE_STYLE || 'tiktok';
-
-      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Burning Subtitle)`);
-
-      // Use relative path for Linux/Docker compatibility in the ass filter
-      const relativePathForFfmpeg = isWin ? assPath.replace(/\\/g, "/").replace(/:/g, "\\:") : `public/temp/${clipId}.ass`;
       
-      // Filter video untuk rasio 9:16 (Portrait) dengan letterboxing (atas-bawah hitam)
-      const filterGraph = `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`;
-      
-      const burnCmd = isWin
-        ? `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "${filterGraph},ass='${relativePathForFfmpeg}'" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`
-        : `"${safeFfmpegPath}" -y -i "${rawClipPath}" -vf "${filterGraph},ass=${relativePathForFfmpeg}" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
+      // TASK A: Ekstraktor
+      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task A: Ekstrak Klip Mentah)`);
+      await MicroTasks.extractRawClip(safeFfmpegPath, originalFilePath, startTime, endTime, rawClipPath);
 
+      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task A: Ekstrak Audio)`);
+      await MicroTasks.extractAudio(safeFfmpegPath, rawClipPath, audioTempPath);
+
+      // TASK B: AI Teks
+      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task B: AI Transkripsi Cloud/Lokal)`);
       try {
-        await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
+        await MicroTasks.generateSubtitles(audioTempPath, assPath);
+      } catch (err: any) {
+        console.error(`[TASK-B] Error:`, err.message);
+        const fallbackAss = `[Script Info]\nScriptType: v4.00+\nPlayResX: 384\nPlayResY: 288\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,(Gagal transkripsi AI Cloud/Lokal)`;
+        await writeFile(assPath, fallbackAss);
+      }
+
+      // TASK C: Renderer
+      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task C: Render Subtitle FFMPEG)`);
+      try {
+        await MicroTasks.renderFinalVideo(safeFfmpegPath, rawClipPath, assPath, outputPath);
       } catch (e: any) {
-        console.error(`[WORKER] Burning failed for ${clipId}:`, e.message);
+        console.error(`[TASK-C] Burning failed for ${clipId}:`, e.message);
         await copyFile(rawClipPath, outputPath);
       }
 
@@ -219,24 +236,61 @@ async function processJob(job: any) {
     console.log(`[WORKER] Job ${jobId} SELESAI!`);
 
   } catch (error: any) {
+    if (error.message === "JOB_CANCELLED") {
+      console.log(`[WORKER] Job ${jobId} di-cancel oleh user. Menghentikan pipeline.`);
+      return;
+    }
     console.error(`[WORKER] ERROR pada job ${jobId}:`, error);
-    db.prepare("UPDATE jobs SET status = 'FAILED', error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(
-      error.message,
-      jobId
-    );
+    try {
+      db.prepare("UPDATE jobs SET status = 'FAILED', error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(
+        error.message,
+        jobId
+      );
+    } catch(e) {}
+  }
+}
+
+let isProcessing = false;
+
+async function checkAndProcessJobs() {
+  if (isProcessing) return;
+  isProcessing = true;
+  
+  try {
+    while (true) {
+      const job = db.prepare("SELECT * FROM jobs WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT 1").get();
+      if (!job) break;
+      
+      await processJob(job);
+    }
+  } catch (error) {
+    console.error("[WORKER] Queue Loop Error:", error);
+  } finally {
+    isProcessing = false;
   }
 }
 
 async function startWorker() {
-  console.log("🚀 AutoClip Background Worker Aktif [VERSI: 1.0.2 - SANITIZER AKTIF]...");
-  while (true) {
-    const job = db.prepare("SELECT * FROM jobs WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT 1").get();
-    if (job) {
-      await processJob(job);
+  console.log("🚀 AutoClip Background Worker Aktif [VERSI: 2.0 - EVENT DRIVEN]...");
+  
+  const server = http.createServer((req, res) => {
+    if (req.url === '/ping' && req.method === 'POST') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'waking up' }));
+      
+      // Asynchronously trigger processing
+      checkAndProcessJobs().catch(console.error);
     } else {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      res.writeHead(404);
+      res.end();
     }
-  }
+  });
+
+  server.listen(3002, '127.0.0.1', () => {
+    console.log("📡 Worker mendengarkan event trigger di port 3002...");
+    // Process any jobs left from previous crashes
+    checkAndProcessJobs().catch(console.error);
+  });
 }
 
 startWorker();

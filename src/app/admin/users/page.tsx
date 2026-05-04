@@ -11,6 +11,8 @@ export default function AdminUsers() {
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editForm, setEditForm] = useState({ email: "", role: "", password: "" });
   const [addForm, setAddForm] = useState({ email: "", password: "", role: "USER", is_verified: true });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchUsers = () => {
     fetch("/api/admin/users")
@@ -95,6 +97,11 @@ export default function AdminUsers() {
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
@@ -138,7 +145,7 @@ export default function AdminUsers() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {filteredUsers.map((user) => (
+            {currentUsers.map((user) => (
               <tr key={user.id} className="hover:bg-muted/50 transition-colors group">
                 <td className="px-8 py-6">
                   <div className="flex items-center space-x-3">
@@ -186,6 +193,32 @@ export default function AdminUsers() {
             ))}
           </tbody>
         </table>
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center px-8 py-4 border-t border-border bg-muted/20">
+            <span className="text-xs text-muted-foreground font-mono">
+              Menampilkan {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredUsers.length)} dari {filteredUsers.length} user
+            </span>
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+              >
+                Prev
+              </button>
+              <div className="flex items-center px-4 font-mono text-xs font-bold bg-background border border-border rounded-lg">
+                {currentPage} / {totalPages}
+              </div>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 text-xs font-bold transition-all text-foreground uppercase tracking-wider"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}
