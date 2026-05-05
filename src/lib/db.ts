@@ -22,6 +22,7 @@ function initDb() {
       video_title TEXT,
       csv_config TEXT, -- JSON string
       status TEXT DEFAULT 'PENDING',
+      current_step TEXT,
       results TEXT, -- JSON string
       error TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -39,6 +40,11 @@ function initDb() {
   // Migration to add 'video_title' to jobs
   try {
     _db.exec("ALTER TABLE jobs ADD COLUMN video_title TEXT");
+  } catch (e) {}
+
+  // Migration to add 'current_step' to jobs
+  try {
+    _db.exec("ALTER TABLE jobs ADD COLUMN current_step TEXT");
   } catch (e) {}
 
   _db.exec(`
