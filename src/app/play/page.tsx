@@ -47,7 +47,6 @@ function PlayVideo() {
             <video 
               src={url} 
               controls 
-              autoPlay 
               className="w-full h-full object-cover bg-black" 
             />
          </div>
