@@ -184,11 +184,28 @@ async function processJob(job: any) {
       await updateJobStep(jobId, 'PROCESSING', 'Mendownload video dari YouTube...');
       originalFilePath = path.join(tempDir, `${jobId}_original.mp4`);
       const fs = require('fs');
-      const cookiesPath = path.join(process.cwd(), 'cookies.txt');
+      const possibleCookiePaths = [
+        path.join(process.cwd(), 'cookies.txt'),
+        path.join(process.cwd(), 'data', 'cookies.txt'),
+        '/app/cookies.txt',
+        '/app/data/cookies.txt',
+        path.join(tempDir, 'cookies.txt')
+      ];
+
+      let cookiesPath = "";
+      for (const p of possibleCookiePaths) {
+        if (fs.existsSync(p)) {
+          cookiesPath = p;
+          break;
+        }
+      }
+
       let cookiesArg = "";
-      if (fs.existsSync(cookiesPath)) {
+      if (cookiesPath) {
         cookiesArg = ` --cookies "${cookiesPath}"`;
-        console.log(`[WORKER] Menggunakan cookies.txt untuk bypass YouTube Bot Check`);
+        console.log(`[WORKER] Menggunakan cookies di ${cookiesPath} untuk bypass YouTube Bot Check`);
+      } else {
+        console.warn(`[WORKER] cookies.txt tidak ditemukan di lokasi manapun. yt-dlp mungkin gagal jika diblokir bot.`);
       }
 
       const ytCmd = `"${ytDlpPath}" --ffmpeg-location "${safeFfmpegPath}" --no-check-certificates${cookiesArg} -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" -o "${originalFilePath}" "${job.url}"`;
