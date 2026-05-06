@@ -108,8 +108,15 @@ async function processJob(job: any) {
 
       await updateJobStep(jobId, 'PROCESSING', 'Mendownload video dari YouTube...');
       originalFilePath = path.join(tempDir, `${jobId}_original.mp4`);
-      console.log(`[WORKER] Downloading YouTube: ${job.url}`);
-      const ytCmd = `"${ytDlpPath}" --ffmpeg-location "${safeFfmpegPath}" --no-check-certificates -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" -o "${originalFilePath}" "${job.url}"`;
+      const fs = require('fs');
+      const cookiesPath = path.join(process.cwd(), 'cookies.txt');
+      let cookiesArg = "";
+      if (fs.existsSync(cookiesPath)) {
+        cookiesArg = ` --cookies "${cookiesPath}"`;
+        console.log(`[WORKER] Menggunakan cookies.txt untuk bypass YouTube Bot Check`);
+      }
+
+      const ytCmd = `"${ytDlpPath}" --ffmpeg-location "${safeFfmpegPath}" --no-check-certificates${cookiesArg} -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" -o "${originalFilePath}" "${job.url}"`;
       await execAsync(ytCmd, { maxBuffer: 1024 * 1024 * 100 });
     }
 
