@@ -267,7 +267,7 @@ async function processJob(job: any) {
         const topicText = config.topic || "Klip Menarik";
         const ttsDuration = await MicroTasks.generateTTS(topicText, ttsAudioPath);
         if (ttsDuration > 0) {
-          freezeTime = ttsDuration + 1.0;
+          freezeTime = ttsDuration + 0.5;
         }
       } catch (err: any) {
         console.error(`[TASK-TTS] Error:`, err.message);
