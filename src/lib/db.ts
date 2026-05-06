@@ -73,6 +73,17 @@ function initDb() {
     )
   `);
 
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id TEXT PRIMARY KEY,
+      logo_url TEXT,
+      logo_size TEXT DEFAULT 'MEDIUM',
+      logo_position TEXT DEFAULT 'TOP_CENTER', 
+      logo_opacity REAL DEFAULT 1.0,
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+  `);
+
   // Migration to add 'role' if it doesn't exist (safety for existing DBs)
   try {
     _db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'USER'");

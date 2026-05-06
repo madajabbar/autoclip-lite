@@ -42,6 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: "Create AutoClip", href: "/generate", icon: Scissors },
     { name: "Active Jobs", href: "/dashboard#jobs", icon: Zap },
     { name: "Media Library", href: "/dashboard#media", icon: Video },
+    { name: "Video Settings", href: "/dashboard/settings", icon: Settings },
   ];
 
   return (

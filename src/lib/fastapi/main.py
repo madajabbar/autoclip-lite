@@ -31,6 +31,7 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,{font_name},{font_size},{primary_color},&H0000FFFF,&H00000000,{back_color},-1,0,0,0,100,100,0,0,3,4,0,2,20,20,400,1
+Style: Hook,Arial Black,80,&H0000FFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,3,6,0,5,20,20,400,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -46,6 +47,7 @@ def load_model():
 class TranscribeRequest(BaseModel):
     audio_path: str
     ass_path: str
+    offset_seconds: float = 0.0
 
 @app.post("/transcribe")
 def transcribe_audio(req: TranscribeRequest):
@@ -76,13 +78,13 @@ def transcribe_audio(req: TranscribeRequest):
                 chunk_size = 3
                 for i in range(0, len(words), chunk_size):
                     chunk = words[i:i + chunk_size]
-                    chunk_start = format_ass_time(chunk[0]['start'])
-                    chunk_end = format_ass_time(chunk[-1]['end'])
+                    chunk_start = format_ass_time(chunk[0]['start'] + req.offset_seconds)
+                    chunk_end = format_ass_time(chunk[-1]['end'] + req.offset_seconds)
                     
                     for active_word_idx in range(len(chunk)):
-                        start_t = format_ass_time(chunk[active_word_idx]['start'])
+                        start_t = format_ass_time(chunk[active_word_idx]['start'] + req.offset_seconds)
                         if active_word_idx < len(chunk) - 1:
-                            end_t = format_ass_time(chunk[active_word_idx + 1]['start'])
+                            end_t = format_ass_time(chunk[active_word_idx + 1]['start'] + req.offset_seconds)
                         else:
                             end_t = chunk_end
                         

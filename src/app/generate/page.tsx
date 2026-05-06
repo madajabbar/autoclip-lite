@@ -30,7 +30,15 @@ export default function Page() {
     let pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`/api/jobs/${activeJobId}`);
-        if (!res.ok) throw new Error("Gagal mengecek status");
+        if (!res.ok) {
+          if (res.status === 404) {
+            setActiveJobId(null);
+            localStorage.removeItem("autoclip_active_job");
+            clearInterval(pollInterval);
+            return;
+          }
+          throw new Error("Gagal mengecek status");
+        }
         
         const data = await res.json();
         

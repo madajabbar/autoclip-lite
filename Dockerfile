@@ -45,7 +45,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 # Install PyTorch CPU version first to prevent massive CUDA downloads
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir -r requirements.txt yt-dlp
+RUN pip install --no-cache-dir -r requirements.txt yt-dlp edge-tts
 
 # Copy files dari builder
 COPY --from=builder /app/package*.json ./

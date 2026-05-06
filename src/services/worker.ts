@@ -28,13 +28,13 @@ class MicroTasks {
   }
 
   // Task B: Panggil FastAPI Inference Engine
-  static async generateSubtitles(audioPath: string, assPath: string) {
-    console.log(`[TASK-B] Sending audio to FastAPI Inference Engine...`);
+  static async generateSubtitles(audioPath: string, assPath: string, offsetSeconds: number = 0.0) {
+    console.log(`[TASK-B] Sending audio to FastAPI Inference Engine with offset ${offsetSeconds}s...`);
     const apiUrl = process.env.FASTAPI_URL || "http://127.0.0.1:8000";
     const response = await fetch(`${apiUrl}/transcribe`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audio_path: audioPath, ass_path: assPath })
+      body: JSON.stringify({ audio_path: audioPath, ass_path: assPath, offset_seconds: offsetSeconds })
     });
 
     if (!response.ok) {
@@ -43,17 +43,86 @@ class MicroTasks {
     }
   }
 
-  // Task C: Render/Burn Subtitles
-  static async renderFinalVideo(ffmpegPath: string, rawVideo: string, assPath: string, finalOut: string) {
+  // Task B2: Generate TTS and return duration
+  static async generateTTS(text: string, outPath: string): Promise<number> {
     const isWin = process.platform === "win32";
-    // For FFmpeg ASS filter, paths need strict formatting
+    // We use edge-tts which should be available in PATH
+    const safeText = text.replace(/"/g, '\\"');
+    const ttsCmd = `edge-tts --voice id-ID-GadisNeural --text "${safeText}" --write-media "${outPath}"`;
+    await execAsync(ttsCmd);
+
+    // Get duration using ffprobe
+    const ffprobeCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${outPath}"`;
+    const { stdout } = await execAsync(ffprobeCmd);
+    return parseFloat(stdout.trim()) || 0;
+  }
+
+  // Task C: Render/Burn Subtitles
+  static async renderFinalVideo(
+    ffmpegPath: string, 
+    rawVideo: string, 
+    assPath: string, 
+    finalOut: string, 
+    userSettings: any, 
+    ttsAudioPath: string | null, 
+    freezeTime: number
+  ) {
+    const isWin = process.platform === "win32";
     const relativePathForFfmpeg = isWin ? assPath.replace(/\\/g, "/").replace(/:/g, "\\:") : assPath;
     
-    // Scale and pad to 9:16 portrait
-    const filterGraph = `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`;
-    
-    // Wrap the ASS path in single quotes to handle spaces if isWin or fallback
-    const burnCmd = `"${ffmpegPath}" -y -i "${rawVideo}" -vf "${filterGraph},ass='${relativePathForFfmpeg}'" -c:v libx264 -preset ultrafast -c:a copy "${finalOut}"`;
+    let filterComplex = "";
+    let inputs = `-i "${rawVideo}" `;
+    let videoStream = "[0:v]";
+    let inputCount = 1;
+
+    // 1. Freeze Frame Pad
+    if (freezeTime > 0) {
+      filterComplex += `${videoStream}tpad=start_duration=${freezeTime}:start_mode=clone[v_frozen]; `;
+      videoStream = "[v_frozen]";
+    }
+
+    // 2. Logo Overlay
+    if (userSettings && userSettings.logo_url) {
+      const logoPath = path.join(process.cwd(), "public", userSettings.logo_url);
+      inputs += `-i "${logoPath}" `;
+      const logoIdx = inputCount++;
+      
+      const sizeMap: Record<string, number> = { SMALL: 100, MEDIUM: 150, LARGE: 200 };
+      const size = sizeMap[userSettings.logo_size] || 150;
+      const opacity = userSettings.logo_opacity !== undefined ? userSettings.logo_opacity : 1.0;
+      
+      const posMap: Record<string, string> = {
+        TOP_LEFT: "30:30",
+        TOP_CENTER: "(W-w)/2:30",
+        TOP_RIGHT: "W-w-30:30",
+        BOTTOM_LEFT: "30:H-h-30",
+        BOTTOM_CENTER: "(W-w)/2:H-h-30",
+        BOTTOM_RIGHT: "W-w-30:H-h-30"
+      };
+      const pos = posMap[userSettings.logo_position] || posMap["TOP_CENTER"];
+
+      filterComplex += `[${logoIdx}:v]crop=w='min(iw,ih)':h='min(iw,ih)',scale=${size}:${size},format=rgba,colorchannelmixer=aa=${opacity}[logo_processed]; `;
+      filterComplex += `${videoStream}[logo_processed]overlay=x='${pos.split(':')[0]}':y='${pos.split(':')[1]}'[v_logo]; `;
+      videoStream = "[v_logo]";
+    }
+
+    // 3. Scale and Pad 9:16 + Burn Subtitles
+    filterComplex += `${videoStream}scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,ass='${relativePathForFfmpeg}'[vout]`;
+
+    // Audio Processing
+    let audioMap = "-map 0:a";
+    if (freezeTime > 0 && ttsAudioPath) {
+      inputs += `-i "${ttsAudioPath}" `;
+      const ttsIdx = inputCount++;
+      const delayMs = Math.round(freezeTime * 1000);
+      
+      // Filter graph for audio
+      filterComplex += `; [0:a]adelay=delays=${delayMs}|${delayMs}[a_delayed]; `;
+      filterComplex += `[a_delayed][${ttsIdx}:a]amix=inputs=2:duration=longest:dropout_transition=2[aout]`;
+      audioMap = "-map \"[aout]\"";
+    }
+
+    const burnCmd = `"${ffmpegPath}" -y ${inputs} -filter_complex "${filterComplex}" -map "[vout]" ${audioMap} -c:v libx264 -preset ultrafast -c:a aac "${finalOut}"`;
     await execAsync(burnCmd, { maxBuffer: 1024 * 1024 * 100 });
   }
 }
@@ -94,6 +163,12 @@ async function processJob(job: any) {
 
     let originalFilePath = job.file_path;
     let videoTitle = job.video_title || "Video";
+
+    // Get User Settings
+    let userSettings = null;
+    if (job.user_id) {
+      userSettings = db.prepare("SELECT * FROM user_settings WHERE user_id = ?").get(job.user_id);
+    }
 
     // 1. Download YouTube if needed
     if (job.type === 'youtube' && job.url) {
@@ -145,16 +220,19 @@ async function processJob(job: any) {
 
       const clipId = uuidv4();
 
+      const topicTitle = config.topic ? sanitizeFilename(config.topic) : sanitizedTitle;
+
       // Descriptive filename
-      const descriptiveName = `${sanitizedTitle} [${timestamp}] ${i + 1} dari ${clipsConfig.length}.mp4`;
+      const descriptiveName = `${topicTitle} [${timestamp}] ${i + 1} dari ${clipsConfig.length}.mp4`;
       const outputPath = path.join(resultsDir, descriptiveName);
       const encodedUrl = `/api/videos/${encodeURIComponent(descriptiveName)}`;
-      const clipTitle = `${sanitizedTitle} [${new Date().toLocaleDateString()}]`;
+      const clipTitle = config.topic || `${sanitizedTitle} [${new Date().toLocaleDateString()}]`;
 
       const assPath = path.join(tempDir, `${clipId}.ass`);
       const relativeAssPath = `public/temp/${clipId}.ass`;
       const audioTempPath = path.join(tempDir, `${clipId}.mp3`);
       const rawClipPath = path.join(tempDir, `${clipId}_raw.mp4`);
+      const ttsAudioPath = path.join(tempDir, `${clipId}_tts.mp3`);
 
       console.log(`[WORKER] Clipping ${i + 1}/${clipsConfig.length}`);
       
@@ -165,20 +243,56 @@ async function processJob(job: any) {
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task A: Ekstrak Audio)`);
       await MicroTasks.extractAudio(safeFfmpegPath, rawClipPath, audioTempPath);
 
+      // TASK A3: Generate TTS
+      let freezeTime = 0;
+      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task A: Generate AI TTS)`);
+      try {
+        const topicText = config.topic || "Klip Menarik";
+        const ttsDuration = await MicroTasks.generateTTS(topicText, ttsAudioPath);
+        if (ttsDuration > 0) {
+          freezeTime = ttsDuration + 1.0;
+        }
+      } catch (err: any) {
+        console.error(`[TASK-TTS] Error:`, err.message);
+      }
+
       // TASK B: AI Teks
       await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task B: AI Transkripsi Cloud/Lokal)`);
       try {
-        await MicroTasks.generateSubtitles(audioTempPath, assPath);
+        await MicroTasks.generateSubtitles(audioTempPath, assPath, freezeTime);
+        
+        // Inject Hook Subtitle
+        if (freezeTime > 0) {
+          const fs = require('fs');
+          if (fs.existsSync(assPath)) {
+            const formatAssTime = (seconds: number) => {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = Math.floor(seconds % 60);
+                const centiseconds = Math.floor((seconds % 1) * 100);
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+            };
+            const hookEndStr = formatAssTime(freezeTime);
+            const safeTopic = (config.topic || "").replace(/,/g, " ");
+            const hookLine = `Dialogue: 1,0:00:00.00,${hookEndStr},Hook,,0,0,0,,${safeTopic}\n`;
+            
+            // Read ASS file and append after [Events]
+            const assContent = fs.readFileSync(assPath, 'utf8');
+            const newAssContent = assContent.replace('[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n', `[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${hookLine}`);
+            fs.writeFileSync(assPath, newAssContent);
+          }
+        }
       } catch (err: any) {
         console.error(`[TASK-B] Error:`, err.message);
-        const fallbackAss = `[Script Info]\nScriptType: v4.00+\nPlayResX: 384\nPlayResY: 288\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,(Gagal transkripsi AI Cloud/Lokal)`;
-        await writeFile(assPath, fallbackAss);
+        const fallbackAss = `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,36,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,(Gagal transkripsi AI Cloud/Lokal)`;
+        const fs = require('fs');
+        fs.writeFileSync(assPath, fallbackAss);
       }
 
       // TASK C: Renderer
-      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task C: Render Subtitle FFMPEG)`);
+      await updateJobStep(jobId, 'PROCESSING', `${stepText} (Task C: Render Efek & Subtitle FFMPEG)`);
       try {
-        await MicroTasks.renderFinalVideo(safeFfmpegPath, rawClipPath, assPath, outputPath);
+        await MicroTasks.renderFinalVideo(safeFfmpegPath, rawClipPath, assPath, outputPath, userSettings, ttsAudioPath, freezeTime);
       } catch (e: any) {
         console.error(`[TASK-C] Burning failed for ${clipId}:`, e.message);
         await copyFile(rawClipPath, outputPath);
