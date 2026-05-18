@@ -208,7 +208,7 @@ async function processJob(job: any) {
         console.warn(`[WORKER] cookies.txt tidak ditemukan di lokasi manapun. yt-dlp mungkin gagal jika diblokir bot.`);
       }
 
-      const ytCmd = `"${ytDlpPath}" --ffmpeg-location "${safeFfmpegPath}" --no-check-certificates${cookiesArg} -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" -o "${originalFilePath}" "${job.url}"`;
+      const ytCmd = `"${ytDlpPath}" --ffmpeg-location "${safeFfmpegPath}" --js-runtimes node --no-check-certificates${cookiesArg} -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" --merge-output-format mp4 -o "${originalFilePath}" "${job.url}"`;
       await execAsync(ytCmd, { maxBuffer: 1024 * 1024 * 100 });
     }
 
